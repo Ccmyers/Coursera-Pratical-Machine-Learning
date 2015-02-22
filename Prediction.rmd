@@ -1,0 +1,134 @@
+---
+title: "Practical Machine Learning Project"
+output: html_document
+---
+
+Predict the "classe" in which 20 test subject did an exercise, correctly ("A"), or 4 incorrect methods ("B" to "E")
+To create the prediction model, cleaned up data provided ("make tidy"), split the training data into data for the model (70%) and cross-validation data (30%), then used RandomForest algorithm on the training data set.
+
+Prediction of model on portiion of training data (not used in generating the model) had Accuracy : 0.9995
+As expected the prediction error on the training data set used to create the model was smaller (no error) than the cross-valiation set.
+
+### Prep work
+Install libraries
+```{r, echo=TRUE}
+require(randomForest)
+require(caret)
+require(ggplot2)
+```
+
+Read csv files
+```{r, echo=TRUE}
+training <- read.csv(file="pml-training.csv",sep=",",header=TRUE)
+testing  <- read.csv(file="pml-testing.csv",sep=",",header=TRUE)
+dim(training)
+dim(testing)
+```
+
+### Make the data tidy, using same approach for testing and training data
+
+Remove columns that that are NA or blank in testing in both files (calculated data by researchers)
+
+Remove index, new_window and cvtd_timestamp  columns in both files
+
+Replace 'problem_id' with 'classe' column in test data - "tidytesting"
+
+```{r, echo=TRUE}
+tidytraining<- subset(training,select =grep("min",invert=TRUE,names(training)))
+tidytraining<- subset(tidytraining,select =grep("max",invert=TRUE,names(tidytraining)))
+tidytraining<- subset(tidytraining,select =grep("kurtosis",invert=TRUE,names(tidytraining)))
+tidytraining<- subset(tidytraining,select =grep("avg",invert=TRUE,names(tidytraining)))
+tidytraining<- subset(tidytraining,select =grep("var",invert=TRUE,names(tidytraining)))
+tidytraining<- subset(tidytraining,select =grep("stddev",invert=TRUE,names(tidytraining)))
+tidytraining<- subset(tidytraining,select =grep("skewness",invert=TRUE,names(tidytraining)))
+tidytraining<- subset(tidytraining,select =grep("amplitude",invert=TRUE,names(tidytraining)))
+
+tidytraining<-tidytraining[,-1]
+tidytraining<-tidytraining[,-5]
+tidytraining<-tidytraining[,-4]
+
+dim(tidytraining)
+
+tidytesting<- subset(testing,select =grep("min",invert=TRUE,names(testing)))
+tidytesting<- subset(tidytesting,select =grep("max",invert=TRUE,names(tidytesting)))
+tidytesting<- subset(tidytesting,select =grep("kurtosis",invert=TRUE,names(tidytesting)))
+tidytesting<- subset(tidytesting,select =grep("avg",invert=TRUE,names(tidytesting)))
+tidytesting<- subset(tidytesting,select =grep("var",invert=TRUE,names(tidytesting)))
+tidytesting<- subset(tidytesting,select =grep("stddev",invert=TRUE,names(tidytesting)))
+tidytesting<- subset(tidytesting,select =grep("skewness",invert=TRUE,names(tidytesting)))
+tidytesting<- subset(tidytesting,select =grep("amplitude",invert=TRUE,names(tidytesting)))
+
+tidytesting <-tidytesting [,-1]
+tidytesting <-tidytesting [,-5]
+tidytesting <-tidytesting [,-58]
+tidytesting$classe <- factor(c("A", "B", "C", "D", "E"))
+tidytesting <-tidytesting [,-4]
+
+dim(tidytesting)
+```
+### Generating model
+
+Parition training set into subset of training and testing for model checking
+```{r, echo=TRUE}
+intrain <-createDataPartition(y=tidytraining$classe,p=0.7,list=FALSE)
+subtraining <- tidytraining[intrain,]
+subcrossvald <- tidytraining[-intrain,]
+```
+
+Use RandomForest algorithm (as also done by the researchers)
+```{r, echo=TRUE}
+rfsub <- randomForest(classe ~.,data=subtraining)
+```
+
+View output of model
+```{r, echo=TRUE}
+rfsub
+plot(rfsub)
+varImpPlot(rfsub)
+```
+
+
+### Predict outcomes using model from RandomForest
+
+Predict values on each training data subset
+```{r, echo=TRUE}
+predsubtrain <- predict(rfsub,newdata=subtraining)
+predcrossvald <- predict(rfsub,newdata=subcrossvald)
+```
+
+Compare results of model fit on both against subtraining, and subtesting data
+```{r, echo=TRUE}
+confusionMatrix(predsubtrain,subtraining$classe)
+confusionMatrix(predcrossvald,subcrossvald$classe)
+```
+No error on subset of training data used to create model
+
+Very small error on the cross validation data using the model built from the training data
+
+Predict 20 values on tidytesting data
+```{r, echo=TRUE}
+pred <- predict(rfsub,newdata=tidytesting)
+pred
+```
+
+
+generate text files for submission
+```{r, echo=TRUE}
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(pred)
+```
+
+
+
+
+
+
+
